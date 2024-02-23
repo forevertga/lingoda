@@ -86,3 +86,60 @@ cd my_project/
 [4]: https://symfony.com/download
 [5]: https://symfony.com/book
 [6]: https://getcomposer.org/
+
+
+## Containerize Application
+
+### Docker
+1. Build docker image:  
+    ```
+    docker build . -t lingoda:v1
+    ```
+
+2. Test container by starting it:
+    ```
+    docker run -p 8000:8000 lingoda:v1
+    ```
+  
+3. Re-tag image:
+    ```
+    docker tag lingoda:v1 forevertga/lingoda:v1
+    ```
+
+3. Push image to Iamge registry (Dockerhub):
+  `Note:` Ensure to first create the repository at the image registry e.g., on Dockerhub 
+    ```
+    docker push forevertga/lingoda:v1
+    ```
+
+### Kubernetes
+1. Create a secret to allow access to the image resgistry from the k8s cluster:
+    ```
+    export DOCKER_REGISTRY_SERVER=https://index.docker.io/v1/
+    export DOCKER_USER=myregistryname
+    export DOCKER_PASSWORD=myregistrytoken
+    export DOCKER_EMAIL=YOUR_EMAIL
+
+    kubectl -n <namespace> create secret docker-registry regcred\
+    --docker-server=$DOCKER_REGISTRY_SERVER\
+    --docker-username=$DOCKER_USER\
+    --docker-password=$DOCKER_PASSWORD\
+    --docker-email=$DOCKER_EMAIL
+    ```
+    `Note:` the above creates a Secret in the specified namespace. This Secret should be created in the same namespace where the apps will be deployed.
+
+
+2. Deploy the app using the manifest file:
+    ```
+    kubectl apply -f kubernetes/deployment.yaml
+    ```
+
+3. Expose the app to make it accessible and functional:
+    ```
+    kubectl apply -f kubernetes/service.yaml
+    ```
+    This Service object uses a Nodeport type. When running on a linux server for instance, the application will be accessible on `<node-ip>:<node-port>`. 
+
+    When running locally you will have to port forward to access it via localhost -->  http://localhost:8000
+    ```
+    kubectl port-forward pod/symfony-6794fb6cff-5cfck 8000:8000
