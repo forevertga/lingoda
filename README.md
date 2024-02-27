@@ -89,6 +89,7 @@ cd my_project/
 
 
 ## Containerize Application
+**Important Information:** This is implementation is done assuming the database integrated is MySQL database
 
 ### Docker
 1. Build docker image:  
@@ -113,6 +114,7 @@ cd my_project/
     ```
 
 ### Kubernetes
+# Task 1 
 1. Create a secret to allow access to the image resgistry from the k8s cluster:
     ```
     export DOCKER_REGISTRY_SERVER=https://index.docker.io/v1/
@@ -143,3 +145,62 @@ cd my_project/
     When running locally you will have to port forward to access it via localhost -->  http://localhost:8000
     ```
     kubectl port-forward pod/symfony-6794fb6cff-5cfck 8000:8000
+
+# Task 2
+4. This part needs migration files to be added and since the demo app does not have migration files, only uncomment the initContainer portion of the code to run migration, the task 2 works perfectly here when uncommented provided the migration files are provided to be registered during deployment:
+    ```
+    initContainers:
+       - name: migration
+         image: forevertga/lingoda:v1
+         command: ['sh', '-c', 'composer require symfony/runtime && php bin/console doctrine:migrations:migrate --no-interaction']
+    ```
+
+# Task 3
+5. Create HPA - Scaling issues
+
+    When the load increases, we want to also have the pods automatically increase to match demand. Therefore if there is increased load, horizontal scaling deploys more pods to handle the said load. Similarly, if the load decreases, and the number of pods is above the configured minimum, the hpa will work to ensure that it scales down.
+
+    First, we need to install metric server (if it does not already exist) in the cluster. This exposes metrics through the Kubernetes API. To install Metric Server, download the manifest using:
+    ```
+    wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+    ```
+    Update the manifest file and include the arg: `--kubelet-insecure-tls`
+
+    Then apply the manifest to the cluster:
+    ```
+    kubectl apply -f kubernetes/components.yaml
+    ```
+
+    Check the status of the metric-server using the following command:
+    ```
+    kubectl -n kube-system get deployments metrics-server
+    ```
+
+    Once the metric server is in a ready state, create the autoscaler
+    ```
+    kubectl apply -f kubernetes/hpa.yaml
+    ```
+    The above autoscaler maintains an average cpu utilization across all pods of 50%. Get the status of the autoscaler using:
+    ```
+    kubectl get hpa
+    ```
+
+
+    
+    To test the above, we can simulate increased load by running the following in a separate terminal:
+    ```
+    kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://lingoda:8000; done"
+    ```
+
+    Watch the hpa in a different terminal:
+    ```
+    kubectl get hpa symfony --watch
+    ```
+
+
+    # Todo - improvement 
+    - Create a single Makefile to implement Task 1, 2 and 3
+    - Use base64 encoded values for the database credentials for production
+    - Create Ingress for external link when deployed on AWS, GCP or Azure
+    - Improve on security 
+    - Improve on the demo app to include migrations files but this has to be project specific as the current demo app has a default database used and since I didn't focus on the application codebase, my focus what on the infrastructure

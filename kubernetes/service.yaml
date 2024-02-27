@@ -2,12 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: lingoda
+  labels:
+    app: lingoda
+  namespace: default
 spec:
-  type: NodePort
+  # type: NodePort
   selector:
     app: lingoda
   ports:
     - protocol: TCP
-      port: 80
+      port: 8000
       targetPort: 8000
-      nodePort: 30000
+      # nodePort: 30000
