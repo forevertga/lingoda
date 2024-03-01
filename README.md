@@ -86,3 +86,121 @@ cd my_project/
 [4]: https://symfony.com/download
 [5]: https://symfony.com/book
 [6]: https://getcomposer.org/
+
+
+## Containerize Application
+**Important Information:** This is implementation is done assuming the database integrated is MySQL database
+
+### Docker
+1. Build docker image:  
+    ```
+    docker build . -t lingoda:v1
+    ```
+
+2. Test container by starting it:
+    ```
+    docker run -p 8000:8000 lingoda:v1
+    ```
+  
+3. Re-tag image:
+    ```
+    docker tag lingoda:v1 forevertga/lingoda:v1
+    ```
+
+3. Push image to Iamge registry (Dockerhub):
+  `Note:` Ensure to first create the repository at the image registry e.g., on Dockerhub 
+    ```
+    docker push forevertga/lingoda:v1
+    ```
+
+### Kubernetes
+# Task 1 
+1. Create a secret to allow access to the image resgistry from the k8s cluster:
+    ```
+    export DOCKER_REGISTRY_SERVER=https://index.docker.io/v1/
+    export DOCKER_USER=myregistryname
+    export DOCKER_PASSWORD=myregistrytoken
+    export DOCKER_EMAIL=YOUR_EMAIL
+
+    kubectl -n <namespace> create secret docker-registry regcred\
+    --docker-server=$DOCKER_REGISTRY_SERVER\
+    --docker-username=$DOCKER_USER\
+    --docker-password=$DOCKER_PASSWORD\
+    --docker-email=$DOCKER_EMAIL
+    ```
+    `Note:` the above creates a Secret in the specified namespace. This Secret should be created in the same namespace where the apps will be deployed.
+
+
+2. Deploy the app using the manifest file:
+    ```
+    kubectl apply -f kubernetes/deployment.yaml
+    ```
+
+3. Expose the app to make it accessible and functional:
+    ```
+    kubectl apply -f kubernetes/service.yaml
+    ```
+    This Service object uses a Nodeport type. When running on a linux server for instance, the application will be accessible on `<node-ip>:<node-port>`. 
+
+    When running locally you will have to port forward to access it via localhost -->  http://localhost:8000
+    ```
+    kubectl port-forward pod/symfony-6794fb6cff-5cfck 8000:8000
+
+# Task 2
+4. This part needs migration files to be added and since the demo app does not have migration files, only uncomment the initContainer portion of the code to run migration, the task 2 works perfectly here when uncommented provided the migration files are provided to be registered during deployment:
+    ```
+    initContainers:
+       - name: migration
+         image: forevertga/lingoda:v1
+         command: ['sh', '-c', 'composer require symfony/runtime && php bin/console doctrine:migrations:migrate --no-interaction']
+    ```
+
+# Task 3
+5. Create HPA - Scaling issues
+
+    When the load increases, we want to also have the pods automatically increase to match demand. Therefore if there is increased load, horizontal scaling deploys more pods to handle the said load. Similarly, if the load decreases, and the number of pods is above the configured minimum, the hpa will work to ensure that it scales down.
+
+    First, we need to install metric server (if it does not already exist) in the cluster. This exposes metrics through the Kubernetes API. To install Metric Server, download the manifest using:
+    ```
+    wget https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+    ```
+    Update the manifest file and include the arg: `--kubelet-insecure-tls`
+
+    Then apply the manifest to the cluster:
+    ```
+    kubectl apply -f kubernetes/components.yaml
+    ```
+
+    Check the status of the metric-server using the following command:
+    ```
+    kubectl -n kube-system get deployments metrics-server
+    ```
+
+    Once the metric server is in a ready state, create the autoscaler
+    ```
+    kubectl apply -f kubernetes/hpa.yaml
+    ```
+    The above autoscaler maintains an average cpu utilization across all pods of 50%. Get the status of the autoscaler using:
+    ```
+    kubectl get hpa
+    ```
+
+
+    
+    To test the above, we can simulate increased load by running the following in a separate terminal:
+    ```
+    kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://lingoda:8000; done"
+    ```
+
+    Watch the hpa in a different terminal:
+    ```
+    kubectl get hpa symfony --watch
+    ```
+
+
+    # Todo - improvement 
+    - Create a single Makefile to implement Task 1, 2 and 3
+    - Use base64 encoded values for the database credentials for production
+    - Create Ingress for external link when deployed on AWS, GCP or Azure
+    - Improve on security 
+    - Improve on the demo app to include migrations files but this has to be project specific as the current demo app has a default database used and since I didn't focus on the application codebase, my focus what on the infrastructure

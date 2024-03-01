@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lingoda
+  namespace: default # Namespace to deploy the application
+spec:
+  selector:
+    matchLabels:
+      app: lingoda
+  template:
+    metadata:
+      labels:
+        app: lingoda
+    spec:
+      # Image pull secret to access private registry
+      imagePullSecrets:
+        - name: regcred
+      ## Uncomment the following lines to run migration before starting the application
+      ## The demo application does not have migration files
+      # initContainers:
+      #   - name: migration
+      #     image: forevertga/lingoda:v1
+      #     command: ['sh', '-c', 'composer require symfony/runtime && php bin/console doctrine:migrations:migrate --no-interaction']
+      containers:
+        - name: symfony
+          image: forevertga/lingoda:v1
+          ports:
+            - containerPort: 8000
+          env: # If given more time, I will use K8s Secret object to store sensitive data
+            - name: APP_ENV
+              value: "dev"
+            - name: APP_SECRET
+              value: "2ca64f8d83b9e89f5f19d672841d6bb8"
+            - name: "DATABASE_URL"
+              value: "sqlite:///%kernel.project_dir%/data/database.sqlite"
+          resources:
+            limits:
+              cpu: 500m
+            requests:
+              cpu: 200m
