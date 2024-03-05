@@ -127,6 +127,14 @@ cd my_project/
     --docker-username=$DOCKER_USER\
     --docker-password=$DOCKER_PASSWORD\
     --docker-email=$DOCKER_EMAIL
+
+    or 
+
+    kubectl create secret docker-registry regcred\
+    --docker-server=$DOCKER_REGISTRY_SERVER\
+    --docker-username=$DOCKER_USER\
+    --docker-password=$DOCKER_PASSWORD\
+    --docker-email=$DOCKER_EMAIL
     ```
     `Note:` the above creates a Secret in the specified namespace. This Secret should be created in the same namespace where the apps will be deployed.
 
@@ -140,11 +148,11 @@ cd my_project/
     ```
     kubectl apply -f kubernetes/service.yaml
     ```
-    This Service object uses a Nodeport type. When running on a linux server for instance, the application will be accessible on `<node-ip>:<node-port>`. 
 
-    When running locally you will have to port forward to access it via localhost -->  http://localhost:8000
+    When running locally you will have to port forward to access it via localhost -->  http://localhost:8001
     ```
-    kubectl port-forward pod/symfony-6794fb6cff-5cfck 8000:8000
+    kubectl port-forward pod/lingoda-6c9568565b-gq85d 8001:8000
+    ```
 
 # Task 2
 4. This part needs migration files to be added and since the demo app does not have migration files, only uncomment the initContainer portion of the code to run migration, the task 2 works perfectly here when uncommented provided the migration files are provided to be registered during deployment:
@@ -180,7 +188,7 @@ cd my_project/
     ```
     kubectl apply -f kubernetes/hpa.yaml
     ```
-    The above autoscaler maintains an average cpu utilization across all pods of 50%. Get the status of the autoscaler using:
+    The above autoscaler maintains an average cpu utilization(across all pods) of 50%. Get the status of the autoscaler using:
     ```
     kubectl get hpa
     ```
@@ -189,12 +197,12 @@ cd my_project/
     
     To test the above, we can simulate increased load by running the following in a separate terminal:
     ```
-    kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://lingoda:8000; done"
+    kubectl run -i --tty load-generator --rm --image=busybox:1.28 --restart=Never -- /bin/sh -c "while sleep 0.01; do wget -q -O- http://lingoda:8001; done"
     ```
 
     Watch the hpa in a different terminal:
     ```
-    kubectl get hpa symfony --watch
+    kubectl get hpa lingoda --watch
     ```
 
 
@@ -203,4 +211,5 @@ cd my_project/
     - Use base64 encoded values for the database credentials for production
     - Create Ingress for external link when deployed on AWS, GCP or Azure
     - Improve on security 
+    - Add monitoring with Prometheus/Grafana to manage the Scaling Issues
     - Improve on the demo app to include migrations files but this has to be project specific as the current demo app has a default database used and since I didn't focus on the application codebase, my focus what on the infrastructure
